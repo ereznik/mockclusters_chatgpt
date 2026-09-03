@@ -1,0 +1,10 @@
+.DS_Store
+tmp/
+
+# Reproducible binary intermediates; regenerate with Rscript run_all.R.
+data/*.rds
+**/analysis_results.rds
+
+# Superseded pre-CSV-interface output. Current example results live under
+# output/mock_csv_run/.
+/results/

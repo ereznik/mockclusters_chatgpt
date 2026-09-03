@@ -1,0 +1,8 @@
+"item","value"
+"input_csv","/Users/ereznik/Documents/chatgpt/mockclusters/data/mock_patients.csv"
+"feature_dictionary","/Users/ereznik/Documents/chatgpt/mockclusters/output/mock_csv_run/feature_dictionary_used.csv"
+"results_directory","/Users/ereznik/Documents/chatgpt/mockclusters/output/mock_csv_run/results"
+"pdf_report","/Users/ereznik/Documents/chatgpt/mockclusters/output/pdf/mixed_clustering_benchmark.pdf"
+"selected_k","4"
+"id_column","patient_id"
+"truth_column","true_cluster"
