@@ -7,10 +7,37 @@ outliers, and structured missingness.
 
 ## Quick start
 
-Analyze any CSV from this directory:
+Start with the real-data-shaped example file:
+
+```text
+data/example_patients_input.csv
+```
+
+It is a runnable, entirely synthetic example of the exact layout expected for
+your own data. It has one header row, one patient per subsequent row, one unique
+ID column, and only candidate clustering features after the ID. It deliberately
+does **not** contain `true_cluster` or any other answer column.
+
+Run all methods and create the PDF with:
 
 ```bash
-Rscript analyze_csv.R --input path/to/patients.csv --k auto
+Rscript analyze_csv.R \
+  --input data/example_patients_input.csv \
+  --output-dir output/example_patients \
+  --pdf output/example_patients/clustering_report.pdf \
+  --id-column patient_id \
+  --k auto
+```
+
+To use your own data, save it anywhere as a CSV and change only the paths:
+
+```bash
+Rscript analyze_csv.R \
+  --input path/to/your_patients.csv \
+  --output-dir output/my_patients \
+  --pdf output/my_patients/clustering_report.pdf \
+  --id-column patient_id \
+  --k auto
 ```
 
 The command infers a feature dictionary if none is supplied and writes it to the
@@ -32,6 +59,65 @@ The final report is written to:
 output/pdf/mixed_clustering_benchmark.pdf
 ```
 
+## Exact CSV structure for your data
+
+Use `data/example_patients_input.csv` as the model. Its first columns and rows
+look like this (the file contains 60 rows so it can be run immediately):
+
+```csv
+"patient_id","age_years","bmi_kg_m2","systolic_bp_mmhg","crp_mg_l","visits_past_year","medication_count","symptom_severity_l1_l4","functional_limitation_l1_l5","care_setting","smoking_status","diabetes","biomarker_positive"
+"P001",62.9,25.6,122.1,2.47,8,4,"L4","L3","urgent","former","No","Yes"
+"P002",48.9,25.6,120.5,1.25,1,,"L1","L2","outpatient","never","Yes","Yes"
+```
+
+Follow these rules when replacing the example with your data:
+
+- Put column names in the first row and exactly one patient in every later row.
+- Keep a complete, unique identifier such as `patient_id`. It is used only to
+  label results and is excluded from clustering with `--id-column patient_id`.
+- Put each candidate clustering feature in its own column. You may add, remove,
+  or rename feature columns; they do not need to match the example names.
+- Store continuous measurements as plain numbers without units or symbols;
+  store count variables as non-negative integers.
+- Store nominal categories as consistent text labels and binary variables as
+  two consistent values such as `Yes` and `No`.
+- Encode ordered categories as `L1`, `L2`, ... in increasing order when relying
+  on automatic type inference. For other encodings, use a reviewed feature
+  dictionary as described below.
+- Represent missing values with an empty field, as in the second example row.
+  `NA`, `N/A`, and `.` are also recognized as missing.
+- Do not put a title, notes, units row, formulas, merged cells, or multiple tables
+  in the CSV. Use UTF-8 text and comma separators.
+- Supply at least 20 patients. A few hundred rows, like the intended use case,
+  is preferable for stability assessment.
+- Do not include cluster labels, outcomes, treatment arms, site, batch, or other
+  variables that should not define clusters as ordinary features. Remove them or
+  list them with `--exclude`, for example `--exclude outcome,site,batch`.
+
+The example feature types are:
+
+| Columns | Intended type |
+|---|---|
+| `age_years`, `bmi_kg_m2`, `systolic_bp_mmhg`, `crp_mg_l` | Continuous |
+| `visits_past_year`, `medication_count` | Discrete counts |
+| `symptom_severity_l1_l4`, `functional_limitation_l1_l5` | Ordinal (`L1` = lowest) |
+| `care_setting`, `smoking_status` | Categorical |
+| `diabetes`, `biomarker_positive` | Binary |
+
+After the first run, inspect
+`output/my_patients/feature_dictionary_used.csv`. If any inferred type or domain
+is wrong, edit that dictionary and rerun:
+
+```bash
+Rscript analyze_csv.R \
+  --input path/to/your_patients.csv \
+  --dictionary output/my_patients/feature_dictionary_used.csv \
+  --output-dir output/my_patients_reviewed \
+  --pdf output/my_patients_reviewed/clustering_report.pdf \
+  --id-column patient_id \
+  --k auto
+```
+
 ## Included mock CSV
 
 The ready-to-use mock dataset is located at:
@@ -44,6 +130,10 @@ It contains 400 patient rows and 103 columns: 100 clustering features plus three
 metadata columns. `patient_id` is the row identifier, `true_cluster` contains the
 four simulation labels for evaluation only, and `site` is an excluded process
 variable. Missing values are represented by empty CSV fields.
+
+This simulation file is useful for benchmarking because its true clusters are
+known. For the structure of an ordinary unlabeled input file, use
+`data/example_patients_input.csv` instead.
 
 Run the complete analysis directly against this CSV with:
 
