@@ -11,7 +11,7 @@ analyze_csv(
   id_column = "patient_id",
   truth_column = "true_cluster",
   exclude = "site",
-  k = 4L,
+  k = "auto",
   max_k = 8L,
   m_imputations = 8L,
   n_subsamples = 10L,

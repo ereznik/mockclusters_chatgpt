@@ -1,4 +1,4 @@
 "delta","interpretation","ARI_vs_truth","ARI_vs_baseline","reassigned_fraction"
--1,"opposite-direction MNAR",0.554312826237071,1,0
-0,"MAR-style baseline",0.554312826237071,1,0
-1,"designed-direction MNAR",0.554312826237071,1,0
+-1,"opposite-direction MNAR",0.182850475795929,1,0
+0,"MAR-style baseline",0.182850475795929,1,0
+1,"designed-direction MNAR",0.182850475795929,1,0

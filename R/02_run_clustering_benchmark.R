@@ -10,7 +10,9 @@ run_clustering_benchmark <- function(
     dictionary_path = file.path("data", "feature_dictionary.csv"),
     results_dir = "results",
     seed = 20260902L,
-    k = 4L,
+    k = "auto",
+    max_k = 8L,
+    auto_k_path = NULL,
     m_imputations = 8L,
     n_subsamples = 10L,
     id_column = NULL,
@@ -42,6 +44,30 @@ run_clustering_benchmark <- function(
   } else sprintf("row_%04d", seq_len(n))
   if (anyNA(patient_id) || anyDuplicated(patient_id)) {
     stop("The ID column must be complete and unique.")
+  }
+  metadata_features <- intersect(dictionary$feature,
+                                 stats::na.omit(c(id_column, truth_column)))
+  if (length(metadata_features)) {
+    stop("Dictionary must not include ID or truth column(s): ",
+         paste(metadata_features, collapse = ", "))
+  }
+
+  automatic_k <- identical(tolower(as.character(k)), "auto")
+  if (automatic_k) {
+    message("Selecting K automatically from three diagnostics...")
+    auto <- select_k_automatically(data, dictionary, max_k = max_k, seed = seed)
+    k <- auto$k
+    if (is.null(auto_k_path)) {
+      auto_k_path <- file.path(results_dir, "auto_k_diagnostics.csv")
+    }
+    utils::write.csv(auto$diagnostics, auto_k_path, row.names = FALSE)
+    message("Automatic K selected: ", k)
+  } else {
+    k <- as.integer(k)
+    if (!is.finite(k) || k < 2L || k >= n) {
+      stop("k must be 'auto' or an integer between 2 and nrow(data)-1.")
+    }
+    if (!is.null(auto_k_path) && file.exists(auto_k_path)) file.remove(auto_k_path)
   }
 
   message("Creating stochastic mixed-type imputations...")
@@ -162,9 +188,9 @@ run_clustering_benchmark <- function(
     )
   }))
 
-  # Explore K rather than relying on a single criterion. K=4 is used for the
-  # benchmark because it is the known simulation truth.
-  max_candidate_k <- min(8L, n - 1L)
+  # Report diagnostics across the candidate K range. Supplied truth labels are
+  # deliberately absent from every K-selection calculation.
+  max_candidate_k <- min(as.integer(max_k), n - 1L)
   message(sprintf("Evaluating candidate cluster counts K=2,...,%d...", max_candidate_k))
   k_grid <- 2:max_candidate_k
   embed <- first_details$embedding$scores
@@ -304,6 +330,8 @@ run_clustering_benchmark <- function(
 
   result <- list(
     settings = list(seed = seed, n = n, p = nrow(dictionary), k = k,
+                    k_selection_mode = if (automatic_k) "auto" else "fixed",
+                    max_k = as.integer(max_k),
                     m_imputations = m_imputations,
                     n_subsamples = n_subsamples,
                     input_file = normalizePath(data_path, mustWork = FALSE),

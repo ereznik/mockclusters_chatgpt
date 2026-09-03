@@ -55,10 +55,16 @@ render_benchmark_report <- function(
   )
   base_cluster_colors <- c("#2C7FB8", "#2A9D8F", "#E9C46A", "#E76F51",
                            "#8C6BB1", "#D95F8D", "#66A61E", "#A6761D")
-  cluster_colors <- if (result$settings$k <= length(base_cluster_colors)) {
-    base_cluster_colors[seq_len(result$settings$k)]
-  } else grDevices::hcl.colors(result$settings$k, "Dark 3")
+  colors_for_levels <- function(n) {
+    if (n <= length(base_cluster_colors)) base_cluster_colors[seq_len(n)]
+    else grDevices::hcl.colors(n, "Dark 3")
+  }
+  cluster_colors <- colors_for_levels(result$settings$k)
   cluster_palette <- stats::setNames(cluster_colors, seq_len(result$settings$k))
+  truth_palette <- if (has_truth) {
+    truth_levels <- levels(factor(result$truth))
+    stats::setNames(colors_for_levels(length(truth_levels)), truth_levels)
+  } else NULL
   page_number <- 0L
 
   theme_report <- function(base_size = 10) {
@@ -225,10 +231,8 @@ render_benchmark_report <- function(
   grid.text("A CSV-first comparison of eight mixed-data clustering strategies",
             x = unit(0.17, "npc"), y = unit(0.64, "npc"), just = "left",
             gp = gpar(col = "#DCE8EF", fontsize = 11))
-  cluster_label <- if (has_truth) "known clusters" else "clusters fitted"
-  grid.text(sprintf("%d patients  |  %d mixed features  |  %d %s",
-                    result$settings$n, result$settings$p, result$settings$k,
-                    cluster_label),
+  grid.text(sprintf("%d patients  |  %d mixed features  |  %d clusters fitted",
+                    result$settings$n, result$settings$p, result$settings$k),
             x = unit(0.17, "npc"), y = unit(0.43, "npc"), just = "left",
             gp = gpar(col = navy, fontsize = 15, fontface = "bold"))
   wrapped_text(
@@ -444,7 +448,14 @@ render_benchmark_report <- function(
   place_plot(p_stab, y = 0.11, height = 0.77)
 
   # K selection.
-  begin_page("Choosing the number of clusters", "No single criterion should determine K")
+  k_selection_subtitle <- if (identical(result$settings$k_selection_mode, "auto")) {
+    sprintf("Automatic rank aggregation selected K=%d; no single criterion should decide K",
+            result$settings$k)
+  } else {
+    sprintf("K=%d was supplied; diagnostics across the candidate range remain essential",
+            result$settings$k)
+  }
+  begin_page("Choosing the number of clusters", k_selection_subtitle)
   ks <- result$k_selection
   p_k1 <- gg$ggplot(ks, gg$aes(k, gower_pam_silhouette)) +
     gg$geom_line(colour = blue, linewidth = 0.8) + gg$geom_point(colour = blue, size = 2) +
@@ -476,7 +487,7 @@ render_benchmark_report <- function(
   )
   p_e1 <- gg$ggplot(emb_df, gg$aes(Axis1, Axis2, colour = Left)) +
     gg$geom_point(alpha = 0.70, size = 1.5) +
-    gg$scale_colour_manual(values = unname(cluster_palette)) +
+    gg$scale_colour_manual(values = if (has_truth) truth_palette else cluster_palette) +
     gg$labs(title = if (has_truth) "Colored by supplied truth" else "Colored by Gower + PAM",
             x = "Axis 1", y = "Axis 2", colour = if (has_truth) "Truth" else "Cluster") +
     theme_report(8)

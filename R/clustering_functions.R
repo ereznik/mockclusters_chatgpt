@@ -149,7 +149,7 @@ mode_value <- function(x) {
   names(tab)[which.max(tab)]
 }
 
-kprototypes_cluster <- function(data, dictionary, k = 4L, nstart = 12L,
+kprototypes_cluster <- function(data, dictionary, k, nstart = 12L,
                                 max_iter = 80L, lambda = 1, seed = 1L) {
   set.seed(seed)
   num <- numeric_block(data, dictionary, include_ordinal = TRUE)
@@ -216,7 +216,7 @@ logsumexp_rows <- function(x) {
   mx + log(rowSums(exp(x - mx)))
 }
 
-diag_gmm <- function(x, k = 4L, nstart = 4L, max_iter = 120L,
+diag_gmm <- function(x, k, nstart = 4L, max_iter = 120L,
                      tol = 1e-5, seed = 1L) {
   x <- as.matrix(x)
   n <- nrow(x)
@@ -265,7 +265,7 @@ diag_gmm <- function(x, k = 4L, nstart = 4L, max_iter = 120L,
   best
 }
 
-latent_class_profile <- function(data, dictionary, k = 4L, nstart = 3L,
+latent_class_profile <- function(data, dictionary, k, nstart = 3L,
                                  max_iter = 100L, tol = 1e-5,
                                  alpha = 0.5, seed = 1L) {
   # Conditional-independence finite mixture: Gaussian profiles for standardized
@@ -333,7 +333,7 @@ latent_class_profile <- function(data, dictionary, k = 4L, nstart = 3L,
   best
 }
 
-spectral_gower <- function(dissimilarity, k = 4L, seed = 1L) {
+spectral_gower <- function(dissimilarity, k, seed = 1L) {
   d <- as.matrix(dissimilarity)
   off_diag <- d[row(d) != col(d)]
   sigma <- stats::median(off_diag[is.finite(off_diag) & off_diag > 0])
@@ -351,7 +351,7 @@ spectral_gower <- function(dissimilarity, k = 4L, seed = 1L) {
        eigenvalues = eig$values[seq_len(k)])
 }
 
-run_all_methods <- function(data, dictionary, k = 4L, seed = 1L,
+run_all_methods <- function(data, dictionary, k, seed = 1L,
                             keep_details = FALSE) {
   method_names <- c("Gower + PAM", "Gower + hierarchical", "k-prototypes",
                     "FAMD-style + k-means", "Latent-embedding mixture",
@@ -462,10 +462,18 @@ align_labels <- function(predicted, reference) {
 }
 
 best_label_accuracy <- function(predicted, truth) {
-  mean(align_labels(predicted, truth) == as.integer(factor(truth)))
+  tab <- table(factor(predicted), factor(truth))
+  dimension <- max(dim(tab))
+  padded <- matrix(0, dimension, dimension)
+  padded[seq_len(nrow(tab)), seq_len(ncol(tab))] <- tab
+  permutations <- all_permutations(seq_len(dimension))
+  matched <- apply(permutations, 1L, function(permutation) {
+    sum(padded[cbind(seq_len(dimension), permutation)])
+  })
+  max(matched) / sum(tab)
 }
 
-consensus_from_partitions <- function(partitions, k = 4L) {
+consensus_from_partitions <- function(partitions, k) {
   partitions <- as.matrix(partitions)
   n <- nrow(partitions)
   coassignment <- matrix(0, n, n)
@@ -492,6 +500,38 @@ pairwise_partition_ari <- function(partitions) {
 mean_silhouette <- function(labels, dissimilarity) {
   if (length(unique(labels)) < 2L) return(NA_real_)
   mean(cluster::silhouette(as.integer(factor(labels)), dissimilarity)[, "sil_width"])
+}
+
+select_k_automatically <- function(data, dictionary, max_k = 8L,
+                                   seed = 20260902L) {
+  max_k <- as.integer(max_k)
+  if (!is.finite(max_k) || max_k < 2L) stop("max_k must be at least 2.")
+  completed <- stochastic_hotdeck_impute(data, dictionary, m = 1L,
+                                         seed = seed + 17L)[[1L]]
+  d <- gower_distance(completed, dictionary)
+  embedding <- mixed_embedding(completed, dictionary, max_dim = 15L)$scores
+  candidate_k <- 2:min(max_k, nrow(data) - 1L)
+  diagnostics <- do.call(rbind, lapply(candidate_k, function(k) {
+    set.seed(seed + k)
+    pam_labels <- cluster::pam(d, k = k, diss = TRUE, cluster.only = TRUE)
+    latent_labels <- stats::kmeans(embedding, centers = k, nstart = 20L)$cluster
+    mixture <- diag_gmm(embedding, k = k, nstart = 2L,
+                        seed = seed + 100L + k)
+    data.frame(
+      k = k,
+      gower_pam_silhouette = mean_silhouette(pam_labels, d),
+      famd_silhouette = mean(cluster::silhouette(
+        latent_labels, stats::dist(embedding))[, "sil_width"]),
+      embedding_gmm_bic = mixture$bic
+    )
+  }))
+  diagnostics$aggregate_rank <-
+    rank(-diagnostics$gower_pam_silhouette, ties.method = "average") +
+    rank(-diagnostics$famd_silhouette, ties.method = "average") +
+    rank(diagnostics$embedding_gmm_bic, ties.method = "average")
+  best_rank <- min(diagnostics$aggregate_rank)
+  selected <- min(diagnostics$k[diagnostics$aggregate_rank == best_rank])
+  list(k = selected, diagnostics = diagnostics)
 }
 
 apply_mnar_delta <- function(imputed, original, dictionary, delta = 0.75) {

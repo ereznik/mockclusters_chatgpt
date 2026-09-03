@@ -150,12 +150,25 @@ Rscript analyze_csv.R \
   --id-column patient_id \
   --truth-column true_cluster \
   --exclude site \
-  --k 4
+  --k auto
 ```
 
 The command infers the mixed feature types from the CSV, runs every clustering
 method, and generates the heatmap report. The truth and site columns are not
 passed to imputation, dimension reduction, or clustering.
+
+## Choosing the number of clusters
+
+The default is `--k auto`; no cluster count is assumed. The workflow scans every
+candidate from K=2 through `--max-k` (8 by default) and ranks candidates using
+three unsupervised diagnostics: Gower/PAM silhouette, mixed-embedding k-means
+silhouette, and latent-mixture BIC. Supplied truth labels are excluded from these
+calculations and are used only for evaluation after clustering.
+
+Adjust `--max-k` when a different search range is scientifically appropriate.
+You can still provide an integer with `--k` for a planned sensitivity analysis,
+but neither the ordinary CSV run nor `run_all.R` does so by default. The complete
+ranking is saved as `auto_k_diagnostics.csv` in the chosen run directory.
 
 To regenerate the deterministic mock CSV and its reference dictionary:
 

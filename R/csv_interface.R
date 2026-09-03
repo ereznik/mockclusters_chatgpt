@@ -157,6 +157,11 @@ prepare_csv_dictionary <- function(data, dictionary_path = NULL,
   if (length(missing_features)) {
     stop("Dictionary features absent from CSV: ", paste(missing_features, collapse = ", "))
   }
+  metadata_features <- intersect(dictionary$feature, excluded_metadata)
+  if (length(metadata_features)) {
+    stop("Dictionary must not include ID, truth, or excluded column(s): ",
+         paste(metadata_features, collapse = ", "))
+  }
   duplicate_features <- dictionary$feature[duplicated(dictionary$feature)]
   if (length(duplicate_features)) stop("Duplicate dictionary feature: ", duplicate_features[1L])
   if (!"role" %in% names(dictionary)) dictionary$role <- "unspecified"
@@ -170,34 +175,6 @@ prepare_csv_dictionary <- function(data, dictionary_path = NULL,
   utils::write.csv(dictionary, used_path, row.names = FALSE)
   list(dictionary = dictionary, path = used_path,
        inferred = is.null(dictionary_path))
-}
-
-select_k_automatically <- function(data, dictionary, max_k = 8L,
-                                   seed = 20260902L) {
-  completed <- stochastic_hotdeck_impute(data, dictionary, m = 1L,
-                                         seed = seed + 17L)[[1L]]
-  d <- gower_distance(completed, dictionary)
-  embedding <- mixed_embedding(completed, dictionary, max_dim = 15L)$scores
-  candidate_k <- 2:min(max_k, nrow(data) - 1L)
-  diagnostics <- do.call(rbind, lapply(candidate_k, function(k) {
-    set.seed(seed + k)
-    pam_labels <- cluster::pam(d, k = k, diss = TRUE, cluster.only = TRUE)
-    latent_labels <- stats::kmeans(embedding, centers = k, nstart = 20L)$cluster
-    mixture <- diag_gmm(embedding, k = k, nstart = 2L, seed = seed + 100L + k)
-    data.frame(
-      k = k,
-      gower_pam_silhouette = mean_silhouette(pam_labels, d),
-      famd_silhouette = mean(cluster::silhouette(latent_labels,
-                                                 stats::dist(embedding))[, "sil_width"]),
-      embedding_gmm_bic = mixture$bic
-    )
-  }))
-  diagnostics$aggregate_rank <-
-    rank(-diagnostics$gower_pam_silhouette, ties.method = "average") +
-    rank(-diagnostics$famd_silhouette, ties.method = "average") +
-    rank(diagnostics$embedding_gmm_bic, ties.method = "average")
-  selected <- diagnostics$k[which.min(diagnostics$aggregate_rank)]
-  list(k = selected, diagnostics = diagnostics)
 }
 
 default_report_filename <- function(input_path) {
@@ -245,24 +222,6 @@ analyze_csv <- function(input_path,
     data, dictionary_path = dictionary_path, id_column = id_column,
     truth_column = truth_column, exclude = exclude, output_dir = output_dir
   )
-  typed <- restore_types(data, prepared$dictionary)
-
-  if (identical(tolower(as.character(k)), "auto")) {
-    message("Selecting K automatically from three diagnostics...")
-    auto <- select_k_automatically(typed, prepared$dictionary,
-                                   max_k = as.integer(max_k), seed = seed)
-    selected_k <- auto$k
-    utils::write.csv(auto$diagnostics,
-                     file.path(output_dir, "auto_k_diagnostics.csv"), row.names = FALSE)
-    message("Automatic K selected: ", selected_k)
-  } else {
-    selected_k <- as.integer(k)
-    if (!is.finite(selected_k) || selected_k < 2L || selected_k >= nrow(data)) {
-      stop("--k must be 'auto' or an integer between 2 and nrow(data)-1.")
-    }
-    stale_auto_path <- file.path(output_dir, "auto_k_diagnostics.csv")
-    if (file.exists(stale_auto_path)) file.remove(stale_auto_path)
-  }
 
   results_dir <- file.path(output_dir, "results")
   result <- run_clustering_benchmark(
@@ -270,12 +229,15 @@ analyze_csv <- function(input_path,
     dictionary_path = prepared$path,
     results_dir = results_dir,
     seed = as.integer(seed),
-    k = selected_k,
+    k = k,
+    max_k = as.integer(max_k),
+    auto_k_path = file.path(output_dir, "auto_k_diagnostics.csv"),
     m_imputations = as.integer(m_imputations),
     n_subsamples = as.integer(n_subsamples),
     id_column = id_column,
     truth_column = truth_column
   )
+  selected_k <- result$settings$k
   result$settings$dictionary_inferred <- prepared$inferred
   result$settings$dictionary_path <- normalizePath(prepared$path, mustWork = FALSE)
   saveRDS(result, file.path(results_dir, "analysis_results.rds"))
@@ -283,12 +245,14 @@ analyze_csv <- function(input_path,
 
   manifest <- data.frame(
     item = c("input_csv", "feature_dictionary", "results_directory", "pdf_report",
-             "selected_k", "id_column", "truth_column"),
+             "selected_k", "k_selection_mode", "max_k", "id_column", "truth_column"),
     value = c(normalizePath(input_path, mustWork = FALSE),
               normalizePath(prepared$path, mustWork = FALSE),
               normalizePath(results_dir, mustWork = FALSE),
               normalizePath(pdf_path, mustWork = FALSE),
               selected_k,
+              result$settings$k_selection_mode,
+              result$settings$max_k,
               ifelse(is.null(id_column), "", id_column),
               ifelse(is.null(truth_column), "", truth_column)),
     stringsAsFactors = FALSE
