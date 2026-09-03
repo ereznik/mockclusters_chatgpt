@@ -3,6 +3,17 @@
 # Rscript R/03_render_report.R results/analysis_results.rds \
 #   output/pdf/mixed_clustering_benchmark.pdf
 
+report_pdf_path <- function(pdf_path) {
+  if (length(pdf_path) != 1L || is.na(pdf_path) || !nzchar(pdf_path)) {
+    stop("A non-empty PDF filename is required.")
+  }
+  filename <- basename(pdf_path)
+  if (!grepl("\\.pdf$", filename, ignore.case = TRUE)) {
+    filename <- paste0(filename, ".pdf")
+  }
+  file.path("output", "pdf", filename)
+}
+
 render_benchmark_report <- function(
     results_path = file.path("results", "analysis_results.rds"),
     pdf_path = file.path("output", "pdf", "mixed_clustering_benchmark.pdf")) {
@@ -13,6 +24,7 @@ render_benchmark_report <- function(
   library(grid)
   gg <- asNamespace("ggplot2")
   result <- readRDS(results_path)
+  pdf_path <- report_pdf_path(pdf_path)
   dir.create(dirname(pdf_path), recursive = TRUE, showWarnings = FALSE)
   has_truth <- if (!is.null(result$settings$has_truth)) {
     isTRUE(result$settings$has_truth)
@@ -720,7 +732,7 @@ render_benchmark_report <- function(
              "run_manifest.csv", "results/method_metrics.csv",
              "results/cluster_assignments.csv", "results/membership_certainty.csv",
              "results/k_selection.csv", "results/mnar_sensitivity.csv",
-             "results/analysis_results.rds", "clustering_report.pdf"),
+             "results/analysis_results.rds", "output/pdf/*_clustering_report.pdf"),
     Purpose = c("Feature types and domains actually used", "Diagnostics used when --k auto is selected",
                 "Input, output, K, ID, and truth settings", "External, internal, stability, and runtime metrics",
                 "Consensus and method-specific patient labels", "Patient-level assignment support",
@@ -731,7 +743,7 @@ render_benchmark_report <- function(
   draw_table(inventory, top = 0.86, bottom = 0.18,
              widths = c(0.43, 0.57), font_size = 8.1)
   wrapped_text(
-    "All run-specific files are written below the chosen --output-dir, except when --pdf explicitly points elsewhere.",
+    "Machine-readable files are written below the chosen --output-dir. PDF reports are always written to output/pdf; --pdf changes only the filename.",
     x = 0.06, y = 0.13, width_chars = 105, fontsize = 8.8, colour = muted
   )
 

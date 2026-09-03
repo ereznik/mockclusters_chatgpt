@@ -24,13 +24,13 @@ Run all methods and create the PDF with:
 Rscript analyze_csv.R \
   --input data/example_patients_input.csv \
   --output-dir output/example_patients \
-  --pdf output/example_patients/clustering_report.pdf \
   --id-column patient_id \
   --k auto
 ```
 
-A prebuilt report from this 60-patient example is committed at
-`output/pdf/example_patients_clustering_report.pdf`.
+The PDF is always written to `output/pdf/`. For this file, the default report is
+`output/pdf/example_patients_clustering_report.pdf`; a prebuilt copy is committed
+there.
 
 To use your own data, save it anywhere as a CSV and change only the paths:
 
@@ -38,13 +38,15 @@ To use your own data, save it anywhere as a CSV and change only the paths:
 Rscript analyze_csv.R \
   --input path/to/your_patients.csv \
   --output-dir output/my_patients \
-  --pdf output/my_patients/clustering_report.pdf \
   --id-column patient_id \
   --k auto
 ```
 
 The command infers a feature dictionary if none is supplied and writes it to the
-run directory for review. Use `Rscript analyze_csv.R --help` for every option.
+run directory for review. Its PDF is saved as
+`output/pdf/your_patients_clustering_report.pdf`. Use `--pdf a_name.pdf` to choose
+a different filename; directory components are ignored so the file still goes
+to `output/pdf/`. Use `Rscript analyze_csv.R --help` for every option.
 
 Reproduce the mock-data analysis and final PDF with:
 
@@ -116,7 +118,7 @@ Rscript analyze_csv.R \
   --input path/to/your_patients.csv \
   --dictionary output/my_patients/feature_dictionary_used.csv \
   --output-dir output/my_patients_reviewed \
-  --pdf output/my_patients_reviewed/clustering_report.pdf \
+  --pdf your_patients_reviewed_clustering_report.pdf \
   --id-column patient_id \
   --k auto
 ```
@@ -144,7 +146,7 @@ Run the complete analysis directly against this CSV with:
 Rscript analyze_csv.R \
   --input data/mock_patients.csv \
   --output-dir output/mock_csv_run \
-  --pdf output/pdf/mixed_clustering_benchmark.pdf \
+  --pdf mixed_clustering_benchmark.pdf \
   --id-column patient_id \
   --truth-column true_cluster \
   --exclude site \
@@ -263,8 +265,7 @@ range of cluster counts rather than fixing K from the simulation.
 ## Machine-readable outputs
 
 Each chosen output directory contains the dictionary used, automatic-K
-diagnostics, a run manifest, the PDF (unless directed elsewhere), and a `results/`
-directory containing:
+diagnostics, a run manifest, and a `results/` directory containing:
 
 - `method_metrics.csv`
 - `cluster_assignments.csv`
@@ -274,6 +275,8 @@ directory containing:
 - `missingness_summary.csv`
 - `subsample_stability.csv`
 - `analysis_results.rds`
+
+PDF reports are always written separately to `output/pdf/`.
 
 The mock data include a complete-data truth copy for simulation auditing. The
 benchmark reads only the observed dataset and feature dictionary.

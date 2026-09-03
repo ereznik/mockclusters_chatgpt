@@ -12,7 +12,8 @@ csv_help <- function() {
     "  --input PATH            CSV with one patient per row\n\n",
     "Common options:\n",
     "  --output-dir PATH       Run directory (default: output/csv_run)\n",
-    "  --pdf PATH              PDF path (default: <output-dir>/clustering_report.pdf)\n",
+    "  --pdf NAME              PDF filename inside output/pdf\n",
+    "                          (default: <input>_clustering_report.pdf)\n",
     "  --dictionary PATH       Optional feature dictionary; inferred if omitted\n",
     "  --id-column NAME        Unique patient identifier column\n",
     "  --truth-column NAME     Optional known labels used only for evaluation\n",
@@ -199,6 +200,15 @@ select_k_automatically <- function(data, dictionary, max_k = 8L,
   list(k = selected, diagnostics = diagnostics)
 }
 
+default_report_filename <- function(input_path) {
+  stem <- tools::file_path_sans_ext(basename(input_path))
+  stem <- sub("([_-](input|data))$", "", stem, ignore.case = TRUE)
+  stem <- gsub("[^A-Za-z0-9._-]+", "_", stem)
+  stem <- gsub("^_+|_+$", "", stem)
+  if (!nzchar(stem)) stem <- "clustering"
+  paste0(stem, "_clustering_report.pdf")
+}
+
 analyze_csv <- function(input_path,
                         output_dir = file.path("output", "csv_run"),
                         pdf_path = NULL,
@@ -216,7 +226,8 @@ analyze_csv <- function(input_path,
     stop("The CSV interface expects a .csv file.")
   }
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-  if (is.null(pdf_path)) pdf_path <- file.path(output_dir, "clustering_report.pdf")
+  if (is.null(pdf_path)) pdf_path <- default_report_filename(input_path)
+  pdf_path <- report_pdf_path(pdf_path)
   data <- utils::read.csv(input_path, stringsAsFactors = FALSE,
                           na.strings = c("", "NA", "N/A", "."),
                           check.names = FALSE)
