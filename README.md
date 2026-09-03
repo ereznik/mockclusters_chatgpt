@@ -32,6 +32,44 @@ The final report is written to:
 output/pdf/mixed_clustering_benchmark.pdf
 ```
 
+## Included mock CSV
+
+The ready-to-use mock dataset is located at:
+
+```text
+data/mock_patients.csv
+```
+
+It contains 400 patient rows and 103 columns: 100 clustering features plus three
+metadata columns. `patient_id` is the row identifier, `true_cluster` contains the
+four simulation labels for evaluation only, and `site` is an excluded process
+variable. Missing values are represented by empty CSV fields.
+
+Run the complete analysis directly against this CSV with:
+
+```bash
+Rscript analyze_csv.R \
+  --input data/mock_patients.csv \
+  --output-dir output/mock_csv_run \
+  --pdf output/pdf/mixed_clustering_benchmark.pdf \
+  --id-column patient_id \
+  --truth-column true_cluster \
+  --exclude site \
+  --k 4
+```
+
+The command infers the mixed feature types from the CSV, runs every clustering
+method, and generates the heatmap report. The truth and site columns are not
+passed to imputation, dimension reduction, or clustering.
+
+To regenerate the deterministic mock CSV and its reference dictionary:
+
+```bash
+Rscript R/01_generate_mock_data.R
+```
+
+The reference feature dictionary is `data/feature_dictionary.csv`.
+
 ## Scripts
 
 - `analyze_csv.R` is the one-command entry point for arbitrary CSV files.
