@@ -29,6 +29,9 @@ Rscript analyze_csv.R \
   --k auto
 ```
 
+A prebuilt report from this 60-patient example is committed at
+`output/pdf/example_patients_clustering_report.pdf`.
+
 To use your own data, save it anywhere as a CSV and change only the paths:
 
 ```bash
